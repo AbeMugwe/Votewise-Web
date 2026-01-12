@@ -73,7 +73,7 @@ const VoteWiseLanding: React.FC = () => {
           </p>
           <div className="flex flex-col sm:flex-row justify-center gap-4">
             <a 
-              href="/signin"
+              href="/signup"
               className="bg-white text-green-900 font-semibold px-8 py-3 rounded-lg hover:bg-gray-100 transition shadow-lg"
             >
               Start Learning Now
@@ -271,7 +271,7 @@ const VoteWiseLanding: React.FC = () => {
             Join thousands of Kenyan youth learning about democracy and making their voices heard.
           </p>
           <a 
-            href="/signup"
+            href="../signup"
             className="inline-block bg-white text-green-900 font-bold px-10 py-4 rounded-lg hover:bg-gray-100 transition shadow-xl text-lg"
           >
             Get Started Free

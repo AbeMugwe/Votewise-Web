@@ -1,0 +1,32 @@
+.Hero{
+    background-color: white;
+    height: 100%;
+    width: 100%;
+    display: flex;
+    align-items: center;
+    flex-direction: column;
+}
+
+.Navbar{
+    padding: 10px;
+    background-color: green;
+    color: white;
+    display: flex;
+    flex-direction: row;
+    height: 50px;
+    font-weight: bold;
+    justify-content: center;
+    gap: 100px;
+
+}
+.Home{
+    height: 30px;
+    width: 60px;
+    padding: 5px;
+    color: black;
+    font-weight: bold;
+    background-color: white;
+    border-radius: 5px;
+
+
+}
