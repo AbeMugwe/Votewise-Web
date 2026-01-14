@@ -1,6 +1,7 @@
 'use client';
 import React, { useState } from 'react';
 import { Eye, EyeOff } from 'lucide-react';
+import { authClient } from "@/lib/auth-client";
 
 export default function VoteWiseCreateAccount() {
   const [showPassword, setShowPassword] = useState(false);
@@ -20,14 +21,28 @@ export default function VoteWiseCreateAccount() {
   }));
   };
 
-  const handleSubmit = () => {
-    if (formData.password !== formData.confirmPassword) {
-      alert('Passwords do not match!');
-      return;
-    }
-    console.log('Account created:', formData);
-    alert('Account created successfully!');
-  };
+  const handleSubmit = async () => {
+  if (formData.password !== formData.confirmPassword) {
+    alert("Passwords do not match!");
+    return;
+  }
+
+  const { data, error } = await authClient.signUp.email({
+    name: formData.fullName,          // Better Auth expects "name" :contentReference[oaicite:3]{index=3}
+    email: formData.email,
+    password: formData.password,
+    // callbackURL: "/dashboard", // optional
+  });
+
+  if (error) {
+    alert(error.message ?? "Signup failed");
+    return;
+  }
+
+  // ✅ At this point, the user has been created (stored in Convex by Better Auth)
+  alert("Account created successfully!");
+  console.log("Signed up:", data);
+};
 
   return (
     <div className="min-h-screen bg-black flex flex-col">
