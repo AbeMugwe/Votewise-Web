@@ -18,4 +18,19 @@ export default defineSchema({
     // Your custom field
     fullName: v.optional(v.string()),
   }).index("email", ["email"]),
+   profile: defineTable({
+    userId: v.string(),
+    name: v.string(),
+    email: v.string(),
+    points: v.number(),
+    rank: v.optional(v.string()),
+    modulesCompleted: v.number(),
+    totalModules: v.number(),
+    badgesEarned: v.number(),
+    progressPercentage: v.number(),
+    lastActive: v.number(),
+    createdAt: v.number(),
+  })
+    .index("by_userId", ["userId"])
+    .index("by_points", ["points"]),
 });
