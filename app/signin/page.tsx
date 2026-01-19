@@ -2,6 +2,7 @@
 import React, { useState } from 'react';
 import { Eye, EyeOff } from 'lucide-react';
 import { authClient } from "@/lib/auth-client";
+import { useRouter } from 'next/navigation';
 
 export default function VoteWiseCreateAccount() {
   const [showPassword, setShowPassword] = useState(false);
@@ -17,6 +18,7 @@ export default function VoteWiseCreateAccount() {
     [name]: value,
   }));
   };
+  const router= useRouter();
 
   const handleSubmit = async () => {
  
@@ -24,7 +26,6 @@ export default function VoteWiseCreateAccount() {
   const { data, error } = await authClient.signIn.email({       
     email: formData.email,
     password: formData.password,
-    // callbackURL: "/dashboard", // optional
   });
 
   if (error) {
@@ -33,7 +34,7 @@ export default function VoteWiseCreateAccount() {
   }
 
   // ✅ At this point, the user has been created (stored in Convex by Better Auth)
-  alert("Signed In successfully!");
+  router.push("/landing");
   console.log("Signed in:", data);
 };
 

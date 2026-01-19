@@ -2,6 +2,7 @@
 import React, { useState } from 'react';
 import { Eye, EyeOff } from 'lucide-react';
 import { authClient } from "@/lib/auth-client";
+import { useRouter } from 'next/navigation';
 
 export default function VoteWiseCreateAccount() {
   const [showPassword, setShowPassword] = useState(false);
@@ -20,6 +21,7 @@ export default function VoteWiseCreateAccount() {
     [name]: value,
   }));
   };
+  const router = useRouter();
 
   const handleSubmit = async () => {
   if (formData.password !== formData.confirmPassword) {
@@ -31,7 +33,7 @@ export default function VoteWiseCreateAccount() {
     name: formData.fullName,          // Better Auth expects "name" :contentReference[oaicite:3]{index=3}
     email: formData.email,
     password: formData.password,
-    // callbackURL: "/dashboard", // optional
+    callbackURL: "/landing"
   });
 
   if (error) {
@@ -40,7 +42,7 @@ export default function VoteWiseCreateAccount() {
   }
 
   // ✅ At this point, the user has been created (stored in Convex by Better Auth)
-  alert("Account created successfully!");
+  router.push("/landing");
   console.log("Signed up:", data);
 };
 

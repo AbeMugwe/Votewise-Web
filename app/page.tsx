@@ -1,4 +1,4 @@
-import VoteWiseLanding from './VotewiseLanding';
+import VoteWiseLanding from './home/VotewiseLanding';
 
 
 export default function Home() {
