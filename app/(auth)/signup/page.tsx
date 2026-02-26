@@ -28,18 +28,33 @@ export default function VoteWiseCreateAccount() {
     alert("Passwords do not match!");
     return;
   }
+  const password = formData.password;
 
+  const hasMinLength = password.length > 5;
+  const hasNumber = /\d/.test(password);
+  const hasSpecial = /[^A-Za-z0-9]/.test(password);
+  const hasUppercase = /[A-Z]/.test(password);
+
+  if (!hasMinLength || !hasNumber || !hasSpecial || !hasUppercase) {
+    const reasons: string[] = [];
+    if (!hasMinLength) reasons.push("at least 5 characters");
+    if (!hasUppercase) reasons.push("at least 1 uppercase letter[A-Z]");
+    if (!hasNumber) reasons.push("at least 1 number[0-9]");
+    if (!hasSpecial) reasons.push("at least 1 special character(!@#$%>?.,/*^{})");
+    alert(`Password must have: ${reasons.join(", ")}`);
+    return;
+  }
   const { data, error } = await authClient.signUp.email({
     name: formData.fullName,          // Better Auth expects "name" :contentReference[oaicite:3]{index=3}
     email: formData.email,
     password: formData.password,
-    callbackURL: "/landing"
   });
 
-  if (error) {
+  if(error){
     alert(error.message ?? "Signup failed");
     return;
   }
+
 
   // ✅ At this point, the user has been created (stored in Convex by Better Auth)
   router.push("/landing");
@@ -166,7 +181,13 @@ export default function VoteWiseCreateAccount() {
 
           {/* Social Login */}
           <div className="flex justify-center gap-8">
-            <button className="p-3 hover:bg-gray-100 rounded-full transition">
+            <button className="p-3 hover:bg-gray-100 rounded-full transition" onClick={() =>
+              authClient.signIn.social({
+              provider: "google",
+              callbackURL: "/landing",
+              errorCallbackURL: "/sign-up",
+              })
+            }>
               <svg className="w-8 h-8" viewBox="0 0 24 24">
                 <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
                 <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/>

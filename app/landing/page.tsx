@@ -3,6 +3,8 @@ import React, { useState, useEffect } from 'react';
 import { authClient } from "@/lib/auth-client";
 import { Menu, X, Home, BookOpen, BarChart3, User, Settings, Moon, HelpCircle, Users, LogOut, Trophy, Award } from 'lucide-react';
 import NavMenu from '../components/Navigation';
+import { useRouter } from 'next/navigation';
+
 
 type SessionUser = {
   name?: string | null;
@@ -35,10 +37,18 @@ export default function VoteWiseDashboard() {
   const toggleDarkMode = () => {
     setIsDarkMode(!isDarkMode);
   };
+  
+  const router= useRouter();
 
-  const handleLogout = () => {
-    console.log("Logging out...");
-    // Add logout logic here
+  const handleLogout = async () => {
+    const { error } = await authClient.signOut();
+
+  if (error) {
+    alert(error.message ?? "Logout failed");
+    return;
+  }
+
+  router.push("/signin");
   };
 
   useEffect(() => {

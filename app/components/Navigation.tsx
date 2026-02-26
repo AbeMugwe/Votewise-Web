@@ -23,7 +23,7 @@ export default function NavMenu({
     <>
       {/* Header */}
       <header className="bg-green-800 text-white px-6 py-4 flex items-center justify-between sticky top-0 z-40">
-        <h1 className="text-xl font-bold">{title}</h1>
+        <h1 className="text-xl font-bold"><a href="/landing">{title}</a></h1>
         <button
           onClick={toggleMenu}
           className="p-2 hover:bg-green-700 rounded-lg transition"

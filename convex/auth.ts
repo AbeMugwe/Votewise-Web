@@ -6,6 +6,8 @@ import { components, internal } from "./_generated/api";
 import type { DataModel } from "./_generated/dataModel";
 import authConfig from "./auth.config";
 
+
+
 // Convex env var (set via `npx convex env set SITE_URL http://localhost:3000`)
 const siteUrl = process.env.SITE_URL!;
 
