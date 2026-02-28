@@ -41,6 +41,10 @@ export const authComponent = createClient<DataModel>(components.betterAuth, {
 export const createAuth = (ctx: GenericCtx<DataModel>) =>
   betterAuth({
     baseURL: siteUrl,
+    trustedOrigins: [
+      "https://votewise-ke.vercel.app",
+      "http://localhost:3000",
+    ],
     database: authComponent.adapter(ctx),
     emailAndPassword: {
       enabled: true,
