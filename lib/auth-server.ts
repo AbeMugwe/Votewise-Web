@@ -12,6 +12,10 @@ export const auth = betterAuth({
       clientSecret: process.env.GOOGLE_CLIENT_SECRET!,
     },
   },
+  trustedOrigins: [
+    "https://votewise-ke.vercel.app",
+    "http://localhost:3000",
+  ],
 });
 
 
