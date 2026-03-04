@@ -1,13 +1,13 @@
 "use client";
-import { useState } from "react";
-import { useQuery } from "convex/react";
+import { useState, useEffect } from "react";
+import { useQuery, useMutation } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import { Id } from "@/convex/_generated/dataModel";
 import { useParams, useRouter } from "next/navigation";
 import NavMenu from "@/app/components/Navigation";
 import BackArrow from "@/app/components/BackArrow";
 import ProgressBar from "@/app/components/ProgressBar";
-import { saveQuizResult } from "@/lib/progressStorage";
+import { authClient } from "@/lib/auth-client";
 
 const font = "system-ui, -apple-system, sans-serif";
 
@@ -22,12 +22,28 @@ export default function QuizPage() {
   const [locked, setLocked] = useState(false);
   const [correctCount, setCorrectCount] = useState(0);
   const [toast, setToast] = useState<{ text: string; ok: boolean } | null>(null);
+  const [userId, setUserId] = useState<string | null>(null);
+  const [userName, setUserName] = useState("");
+  const [userEmail, setUserEmail] = useState("");
 
   const mod = useQuery(api.admin.getModule, { moduleId });
+  const flashcards = useQuery(api.admin.getFlashcardsByModule, { moduleId }) ?? [];
   const questions = useQuery(api.admin.getMultipleChoiceByModule, { moduleId }) ?? [];
+  const completeModule = useMutation(api.progress.completeModule);
 
   const totalQ = questions.length;
   const quizBarPct = totalQ > 0 ? Math.round((qIdx / totalQ) * 100) : 0;
+
+  // Load logged-in user
+  useEffect(() => {
+    authClient.getSession().then(({ data }) => {
+      if (data?.user) {
+        setUserId(data.user.id);
+        setUserName(data.user.name ?? "");
+        setUserEmail(data.user.email ?? "");
+      }
+    });
+  }, []);
 
   const showToast = (text: string, ok: boolean) => {
     setToast({ text, ok });
@@ -50,14 +66,32 @@ export default function QuizPage() {
       isCorrect,
     );
 
-    setTimeout(() => {
+    setTimeout(async () => {
       if (qIdx + 1 < totalQ) {
         setQIdx((q) => q + 1);
         setSelected(null);
         setLocked(false);
       } else {
-        // Save result to localStorage, then navigate back to module overview
-        saveQuizResult(moduleId, newCorrect, totalQ);
+        // Save to localStorage for offline UI
+        console.log("User not logged in, progress not saved");
+
+        // If logged in AND perfect score → award points in Convex
+        if (userId) {
+          try {
+            await completeModule({
+              userId,
+              moduleId,
+              name: userName,
+              email: userEmail,
+              correctAnswers: newCorrect,
+              totalQuestions: totalQ,
+              totalFlashcards: flashcards.length,
+            });
+          } catch (e) {
+            console.error("Failed to save completion:", e);
+          }
+        }
+
         router.push(`/modules/${moduleId}`);
       }
     }, 1200);
@@ -84,7 +118,7 @@ export default function QuizPage() {
         <div style={{ padding: "16px 16px 120px" }}>
           <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 4 }}>
             <BackArrow href={`/modules/${moduleId}/flashcards`} />
-            <h1 style={{ margin: 0, fontSize: 16, fontWeight: 600, color: "black" }}>{mod?.title ?? "Quiz"}</h1>
+            <h1 style={{ margin: 0, fontSize: 16, fontWeight: 600 }}>{mod?.title ?? "Quiz"}</h1>
           </div>
           <ProgressBar pct={quizBarPct} />
 
@@ -122,7 +156,7 @@ export default function QuizPage() {
             </div>
           </div>
 
-          {/* Toast feedback */}
+          {/* Toast */}
           {toast && (
             <div style={{
               marginTop: 16, borderRadius: 10,
@@ -135,7 +169,19 @@ export default function QuizPage() {
             </div>
           )}
 
-          {/* Submit button */}
+          {/* Perfect score notice */}
+          {userId && (
+            <p style={{ textAlign: "center", fontSize: 12, color: "#9ca3af", marginTop: 16 }}>
+              Score 100% to earn 30 points 🏆
+            </p>
+          )}
+          {!userId && (
+            <p style={{ textAlign: "center", fontSize: 12, color: "#9ca3af", marginTop: 16 }}>
+              <a href="/signin" style={{ color: "#16a34a" }}>Sign in</a> to earn points on your leaderboard
+            </p>
+          )}
+
+          {/* Submit */}
           <div style={{ display: "flex", justifyContent: "flex-end", marginTop: 16 }}>
             <button
               disabled={selected === null || locked}

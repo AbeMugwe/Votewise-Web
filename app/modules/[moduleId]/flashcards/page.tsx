@@ -1,13 +1,13 @@
 "use client";
 import { useState, useEffect } from "react";
-import { useQuery } from "convex/react";
+import { useQuery, useMutation } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import { Id } from "@/convex/_generated/dataModel";
 import { useParams } from "next/navigation";
 import NavMenu from "@/app/components/Navigation";
 import BackArrow from "@/app/components/BackArrow";
 import ProgressBar from "@/app/components/ProgressBar";
-import { getProgress, saveSeenCard } from "@/lib/progressStorage"
+import { authClient } from "@/lib/auth-client";
 
 const font = "system-ui, -apple-system, sans-serif";
 
@@ -16,20 +16,46 @@ export default function FlashcardsPage() {
   const moduleId = params.moduleId as Id<"modules">;
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [seen, setSeen] = useState<Set<string>>(new Set());
+  const [userId, setUserId] = useState<string | null>(null);
 
   const mod = useQuery(api.admin.getModule, { moduleId });
   const flashcards = useQuery(api.admin.getFlashcardsByModule, { moduleId }) ?? [];
+  const moduleProgress = useQuery(
+    api.progress.getModuleProgress,
+    userId ? { userId, moduleId } : "skip"
+  );
+  const markFlashcardSeen = useMutation(api.progress.markFlashcardSeen);
 
-  // Load already-seen cards from localStorage on mount
+  // Load session
   useEffect(() => {
-    const p = getProgress(moduleId);
-    setSeen(new Set(p.seenCardIds));
-  }, [moduleId]);
+    authClient.getSession().then(({ data }) => {
+      if (data?.user) setUserId(data.user.id);
+    });
+  }, []);
 
-  const markSeen = (cardId: string) => {
+  // Load seen cards from Convex once progress loads
+  useEffect(() => {
+    if (!moduleProgress || !flashcards.length) return;
+    // Mark first N cards as seen based on saved count
+    const seenCount = moduleProgress.flashcardsCompleted ?? 0;
+    const seenIds = new Set(flashcards.slice(0, seenCount).map((c) => c._id));
+    setSeen(seenIds);
+  }, [moduleProgress, flashcards.length]);
+
+  const markSeen = async (cardId: string) => {
     if (seen.has(cardId)) return;
-    setSeen((prev) => new Set([...prev, cardId]));
-    saveSeenCard(moduleId, cardId); // persist to localStorage
+    const newSeen = new Set([...seen, cardId]);
+    setSeen(newSeen);
+
+    // Save to Convex if logged in
+    if (userId) {
+      await markFlashcardSeen({
+        userId,
+        moduleId,
+        flashcardsSeen: newSeen.size,
+        totalFlashcards: flashcards.length,
+      });
+    }
   };
 
   const totalCards = flashcards.length;
@@ -45,7 +71,6 @@ export default function FlashcardsPage() {
           toggleDarkMode={() => {}}
           handleLogout={() => {}}
         />
-
         <div style={{ padding: "16px 16px 100px" }}>
           <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 4 }}>
             <BackArrow href={`/modules/${moduleId}`} />

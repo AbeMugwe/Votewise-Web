@@ -13,7 +13,7 @@ export default function ModulesListPage() {
   const modules = allModules.filter((m) => m.isPublished);
 
   return (
-    <div style={{ minHeight: "100vh", background: "#f3f4f6", fontFamily: font }}>
+    <div style={{ minHeight: "100vh", background: "#f3f4f6", fontFamily: font, color: "black" }}>
       <NavMenu
         isMenuOpen={isMenuOpen}
         toggleMenu={() => setIsMenuOpen((v) => !v)}

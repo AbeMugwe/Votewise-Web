@@ -8,6 +8,7 @@ import NavMenu from "@/app/components/Navigation";
 import BackArrow from "@/app/components/BackArrow";
 import Confetti from "@/app/components/Confetti";
 import { getProgress, resetQuizProgress } from "@/lib/progressStorage";
+import { authClient } from "@/lib/auth-client";
 
 const font = "system-ui, -apple-system, sans-serif";
 
@@ -22,15 +23,23 @@ export default function ModuleOverviewPage() {
   const flashcards = useQuery(api.admin.getFlashcardsByModule, { moduleId }) ?? [];
   const questions = useQuery(api.admin.getMultipleChoiceByModule, { moduleId }) ?? [];
 
-  // Load progress from localStorage on mount
-  useEffect(() => {
-    const p = getProgress(moduleId);
-    setProgress(p);
-    // Show confetti if badge was just earned (came from quiz)
-    if (p.badgeEarned && document.referrer.includes("/quiz")) {
-      setShowConfetti(true);
-    }
-  }, [moduleId]);
+ const [userId, setUserId] = useState<string | null>(null);
+
+useEffect(() => {
+  authClient.getSession().then(({ data }) => {
+    if (data?.user) setUserId(data.user.id);
+  });
+}, []);
+
+const moduleProgressData = useQuery(
+  api.progress.getModuleProgress,
+  userId ? { userId, moduleId } : "skip"
+);
+
+useEffect(() => {
+  if (!moduleProgressData) return;
+  setShowConfetti(moduleProgressData.completed && document.referrer.includes("/quiz"));
+}, [moduleProgressData]);
 
   if (!mod) return (
     <div style={{ minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center", fontFamily: font, color: "#9ca3af" }}>
@@ -40,10 +49,10 @@ export default function ModuleOverviewPage() {
 
   const totalCards = flashcards.length;
   const totalQ = questions.length;
-  const moduleProgress = Math.min(100, Math.round(
-    (progress.seenCardIds.length / Math.max(1, totalCards)) * 90 +
-    (progress.quizComplete ? (progress.correctAnswers / Math.max(1, totalQ)) * 10 : 0)
-  ));
+  // ✅ Read directly from Convex
+  const moduleProgress = moduleProgressData?.progress ?? 0;
+  const quizComplete = moduleProgressData?.completed ?? false;
+  const badgeEarned = moduleProgressData?.completed ?? false;
 
   const handleRetry = () => {
     resetQuizProgress(moduleId);
@@ -160,10 +169,10 @@ export default function ModuleOverviewPage() {
             cursor: "pointer", boxShadow: "0 6px 16px rgba(0,0,0,.2)",
             textAlign: "center", boxSizing: "border-box",
           }}>
-            {progress.quizComplete ? "Review Learning" : "Start Learning"}
+            {quizComplete ? "Review Learning" : "Start Learning"}
           </a>
 
-          {progress.quizComplete && !progress.badgeEarned && (
+          {quizComplete && !badgeEarned && (
             <button onClick={handleRetry} style={{
               width: "100%", padding: "14px", background: "#fff", color: "#14532d",
               border: "2px solid #14532d", borderRadius: 14, fontSize: 15, fontWeight: 600,

@@ -52,12 +52,12 @@ export default function NavMenu({
               <span className="font-medium">Dashboard</span>
             </a>
 
-            <a href="#" className="flex text-black items-center gap-3 px-4 py-3 rounded-lg hover:bg-gray-100 transition">
+            <a href="/modules" className="flex text-black items-center gap-3 px-4 py-3 rounded-lg hover:bg-gray-100 transition">
               <BookOpen size={20} />
               <span className="font-medium">Learning</span>
             </a>
 
-            <a href="#" className="flex text-black items-center gap-3 px-4 py-3 rounded-lg hover:bg-gray-100 transition">
+            <a href="/leaderboard" className="flex text-black items-center gap-3 px-4 py-3 rounded-lg hover:bg-gray-100 transition">
               <BarChart3 size={20} />
               <span className="font-medium">Leaderboard</span>
             </a>
