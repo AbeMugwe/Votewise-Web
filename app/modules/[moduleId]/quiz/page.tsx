@@ -8,6 +8,7 @@ import NavMenu from "@/app/components/Navigation";
 import BackArrow from "@/app/components/BackArrow";
 import ProgressBar from "@/app/components/ProgressBar";
 import { authClient } from "@/lib/auth-client";
+import BookLoader from "@/app/components/BookLoader";
 
 const font = "system-ui, -apple-system, sans-serif";
 
@@ -98,9 +99,9 @@ export default function QuizPage() {
   };
 
   if (!questions.length) return (
-    <div style={{ minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center", fontFamily: font, color: "#9ca3af" }}>
-      Loading…
-    </div>
+    <div style={{ minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center", backgroundColor: "white" }}>
+        <BookLoader text="Loading questions..." />
+      </div>
   );
 
   const q = questions[qIdx];
