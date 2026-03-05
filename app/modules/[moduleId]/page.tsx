@@ -9,6 +9,7 @@ import BackArrow from "@/app/components/BackArrow";
 import Confetti from "@/app/components/Confetti";
 import { getProgress, resetQuizProgress } from "@/lib/progressStorage";
 import { authClient } from "@/lib/auth-client";
+import BookLoader from "@/app/components/BookLoader";
 
 const font = "system-ui, -apple-system, sans-serif";
 
@@ -42,9 +43,9 @@ useEffect(() => {
 }, [moduleProgressData]);
 
   if (!mod) return (
-    <div style={{ minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center", fontFamily: font, color: "#9ca3af" }}>
-      Loading…
-    </div>
+    <div style={{ minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center", backgroundColor: "white" }}>
+    <BookLoader text="Loading module..." />
+  </div>
   );
 
   const totalCards = flashcards.length;

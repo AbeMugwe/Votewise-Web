@@ -146,6 +146,24 @@ export default function VoteWiseDashboard() {
                   </div>
                 </div>
               ))}
+             {progressPct < 100 && (
+              <a
+                href="/modules"
+                className="flex items-center justify-center gap-2 w-full mt-3 py-3 bg-green-800 text-white rounded-xl font-semibold text-sm hover:bg-green-900 transition"
+              >
+              <BookOpen size={16} />
+              Continue Learning →
+              </a>
+              )}
+
+              {progressPct === 100 && (
+              <a
+              href="/modules"
+              className="flex items-center justify-center gap-2 w-full mt-3 py-3 bg-gray-100 text-green-700 rounded-xl font-semibold text-sm hover:bg-gray-200 transition"
+              >
+              🎉 All done! Review Modules
+              </a>
+              )} 
             </div>
           ) : (
             <div className="text-center py-8">

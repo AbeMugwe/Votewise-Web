@@ -3,6 +3,7 @@ import { useState } from "react";
 import { useQuery } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import NavMenu from "../components/Navigation";
+import BookLoader from "../components/BookLoader";
 
 const font = "system-ui, -apple-system, sans-serif";
 
@@ -28,9 +29,8 @@ export default function ModulesListPage() {
         </p>
 
         {modules.length === 0 && (
-          <div style={{ textAlign: "center", padding: "60px 0", color: "#000000" }}>
-            <div style={{ fontSize: 44, marginBottom: 12 }}>📚</div>
-            <p>No modules available yet. Check back soon!</p>
+          <div style={{ minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center", backgroundColor: "white" }}>
+              <BookLoader text="Just a moment..." />
           </div>
         )}
 
