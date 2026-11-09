@@ -39,3 +39,12 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# Untrusted source downloads; reproducible import scripts are committed instead.
+/data/raw/*
+!/data/raw/SOURCES.md
+
+# keep the template committed
+!.env.example
+
+.env*.local

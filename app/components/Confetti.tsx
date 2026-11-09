@@ -1,15 +1,10 @@
 "use client";
-import { useRef, useState, useEffect } from "react";
+import { useRef, useEffect } from "react";
 
 export default function Confetti({ active }: { active: boolean }) {
   const ref = useRef<HTMLCanvasElement>(null);
-  const [opacity, setOpacity] = useState(1);
-  const [visible, setVisible] = useState(false);
-
   useEffect(() => {
     if (!active) return;
-    setOpacity(1);
-    setVisible(true);
     const canvas = ref.current;
     if (!canvas) return;
     const ctx = canvas.getContext("2d");
@@ -38,17 +33,16 @@ export default function Confetti({ active }: { active: boolean }) {
     draw();
     const stop = setTimeout(() => {
       cancelAnimationFrame(raf);
-      setOpacity(0);
-      setTimeout(() => setVisible(false), 800);
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
     }, 4000);
     return () => { cancelAnimationFrame(raf); clearTimeout(stop); };
   }, [active]);
 
-  if (!visible) return null;
+  if (!active) return null;
   return (
     <canvas ref={ref} style={{
       position: "fixed", inset: 0, pointerEvents: "none", zIndex: 9999,
-      opacity, transition: "opacity 0.8s ease",
+      opacity: 1,
     }} />
   );
 }

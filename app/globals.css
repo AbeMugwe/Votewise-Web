@@ -1,8 +1,40 @@
 @import "tailwindcss";
 
+/*
+ * VoteWise web theme.
+ *
+ * This app shares its content and backend with an Expo app, but it is NOT a
+ * phone app in a browser. Several pages used to be pinned to a literal 390px
+ * column, which read as a mobile screenshot on a desktop display. Web layouts
+ * here use the full page width: multi-column grids, sidebars, and a type scale
+ * sized for a monitor rather than a handset.
+ *
+ * The palette is deterministic (no prefers-color-scheme flip) because a
+ * reviewer's laptop or a projector in dark mode used to invert the page behind
+ * components that set their own light backgrounds.
+ */
 :root {
   --background: #ffffff;
-  --foreground: #171717;
+  --foreground: #0f172a;
+
+  /* Kenya-flag derived brand ramp. */
+  --brand-950: #052e16;
+  --brand-900: #14532d;
+  --brand-800: #166534;
+  --brand-700: #15803d;
+  --brand-600: #16a34a;
+  --brand-100: #dcfce7;
+  --brand-50: #f0fdf4;
+  --accent-red: #b91c1c;
+
+  --surface: #ffffff;
+  --surface-muted: #f8fafc;
+  --border: #e2e8f0;
+
+  /* Consistent elevation, so cards across pages match. */
+  --shadow-sm: 0 1px 2px rgb(15 23 42 / 0.04), 0 1px 3px rgb(15 23 42 / 0.06);
+  --shadow-md: 0 4px 6px -1px rgb(15 23 42 / 0.07), 0 2px 4px -2px rgb(15 23 42 / 0.05);
+  --shadow-lg: 0 12px 24px -8px rgb(15 23 42 / 0.12), 0 4px 8px -4px rgb(15 23 42 / 0.06);
 }
 
 @theme inline {
@@ -12,15 +44,90 @@
   --font-mono: var(--font-geist-mono);
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+html {
+  scroll-behavior: smooth;
+  color-scheme: light;
+  /* Off-canvas panels must never widen the document. */
+  overflow-x: hidden;
 }
 
 body {
-  background: var(--background);
+  background: var(--surface-muted);
   color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  font-family: var(--font-geist-sans), system-ui, -apple-system, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+/* Visible keyboard focus — part of the accessibility story in the demo. */
+:focus-visible {
+  outline: 2px solid var(--brand-600);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
+/*
+ * Page width scale.
+ *   .vw-wide   app screens with grids and sidebars
+ *   .vw-page   standard app content
+ *   .vw-read   long-form reading, capped near 70 characters per line
+ */
+.vw-wide,
+.vw-page,
+.vw-read {
+  margin-inline: auto;
+  width: 100%;
+  padding-inline: 1.25rem;
+}
+@media (min-width: 640px) {
+  .vw-wide,
+  .vw-page,
+  .vw-read {
+    padding-inline: 2rem;
+  }
+}
+.vw-wide { max-width: 84rem; }
+.vw-page { max-width: 72rem; }
+.vw-read { max-width: 48rem; }
+
+/* Card primitive shared by every app surface. */
+.vw-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 1rem;
+  box-shadow: var(--shadow-sm);
+}
+.vw-card-hover {
+  transition: box-shadow 0.2s ease, transform 0.2s ease, border-color 0.2s ease;
+}
+.vw-card-hover:hover {
+  box-shadow: var(--shadow-lg);
+  transform: translateY(-2px);
+  border-color: #86efac;
+}
+
+/* Long-form prose rhythm for the civic reference sections. */
+.vw-prose p {
+  line-height: 1.75;
+  color: #475569;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+/* The quiz and flashcard screens animate in; keep it subtle on desktop. */
+@keyframes vw-fade-up {
+  from { opacity: 0; transform: translateY(8px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+.vw-fade-up {
+  animation: vw-fade-up 0.35s ease both;
 }

@@ -1,10 +1,16 @@
 import { defineSchema, defineTable } from "convex/server";
 import { v } from "convex/values";
-import { authTables } from "@convex-dev/auth/server";
 
 
+/**
+ * The app's own tables.
+ *
+ * `authTables` from "@convex-dev/auth" used to be spread in here, but this app
+ * authenticates with @convex-dev/better-auth, which keeps its user, session and
+ * account tables inside its own component. The spread declared a parallel set
+ * of auth tables that nothing ever wrote to.
+ */
 const schema = defineSchema({
-  ...authTables,
   profile: defineTable({
     userId: v.string(),
     name: v.string(),

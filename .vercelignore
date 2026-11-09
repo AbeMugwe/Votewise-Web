@@ -1,0 +1,6 @@
+data/raw
+backups
+dist
+.next
+convex-dev-backup.zip
+tsconfig.tsbuildinfo

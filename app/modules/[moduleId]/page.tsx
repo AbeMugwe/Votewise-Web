@@ -1,187 +1,316 @@
 "use client";
-import { useState, useEffect } from "react";
+import { useState } from "react";
+import Link from "next/link";
 import { useQuery } from "convex/react";
+import { useParams, useSearchParams } from "next/navigation";
+import {
+  ArrowLeft, Award, BookOpen, CheckCircle2, ClipboardList, Clock,
+  Play, RotateCcw, Trophy,
+} from "lucide-react";
 import { api } from "@/convex/_generated/api";
 import { Id } from "@/convex/_generated/dataModel";
-import { useParams } from "next/navigation";
 import NavMenu from "@/app/components/Navigation";
-import BackArrow from "@/app/components/BackArrow";
 import Confetti from "@/app/components/Confetti";
-import { getProgress, resetQuizProgress } from "@/lib/progressStorage";
-import { authClient } from "@/lib/auth-client";
 import BookLoader from "@/app/components/BookLoader";
+import { isEmojiGlyph } from "@/lib/badgeGlyph";
 
-const font = "system-ui, -apple-system, sans-serif";
-
+/**
+ * Module overview.
+ *
+ * Previously rendered inside a hard-coded `width: 390` column — a phone screen
+ * centred in a desktop browser. It is now a two-column web layout: the module
+ * narrative on the left, and a sticky action rail on the right carrying
+ * progress, the badge and the primary call to action.
+ */
 export default function ModuleOverviewPage() {
   const params = useParams();
   const moduleId = params.moduleId as Id<"modules">;
   const [isMenuOpen, setIsMenuOpen] = useState(false);
-  const [progress, setProgress] = useState({ seenCardIds: [] as string[], correctAnswers: 0, totalQuestions: 0, quizComplete: false, badgeEarned: false });
-  const [showConfetti, setShowConfetti] = useState(false);
+
+  // The quiz redirects here with ?completed=1 when it finishes. That is more
+  // reliable than document.referrer (which browsers frequently strip) and it
+  // can be derived during render instead of from an effect.
+  const searchParams = useSearchParams();
+  const justCompleted = searchParams.get("completed") === "1";
 
   const mod = useQuery(api.admin.getModule, { moduleId });
   const flashcards = useQuery(api.admin.getFlashcardsByModule, { moduleId }) ?? [];
   const questions = useQuery(api.admin.getMultipleChoiceByModule, { moduleId }) ?? [];
+  const moduleProgressData = useQuery(api.progress.getModuleProgress, { moduleId });
 
- const [userId, setUserId] = useState<string | null>(null);
+  if (mod === undefined) {
+    return (
+      <div className="min-h-screen bg-slate-50">
+        <NavMenu isMenuOpen={isMenuOpen} toggleMenu={() => setIsMenuOpen((v) => !v)} />
+        <div className="flex items-center justify-center py-32">
+          <BookLoader text="Loading module…" />
+        </div>
+      </div>
+    );
+  }
 
-useEffect(() => {
-  authClient.getSession().then(({ data }) => {
-    if (data?.user) setUserId(data.user.id);
-  });
-}, []);
+  if (mod === null) {
+    return (
+      <div className="min-h-screen bg-slate-50">
+        <NavMenu isMenuOpen={isMenuOpen} toggleMenu={() => setIsMenuOpen((v) => !v)} />
+        <div className="vw-read py-24 text-center">
+          <h1 className="text-2xl font-bold text-slate-900 mb-2">Module not found</h1>
+          <p className="text-slate-600 mb-6">
+            It may have been unpublished since you last opened this link.
+          </p>
+          <Link
+            href="/modules"
+            className="inline-flex items-center gap-2 bg-green-800 text-white px-5 py-2.5 rounded-lg hover:bg-green-900 transition font-medium"
+          >
+            <ArrowLeft size={16} /> Back to modules
+          </Link>
+        </div>
+      </div>
+    );
+  }
 
-const moduleProgressData = useQuery(
-  api.progress.getModuleProgress,
-  userId ? { userId, moduleId } : "skip"
-);
-
-useEffect(() => {
-  if (!moduleProgressData) return;
-  setShowConfetti(moduleProgressData.completed && document.referrer.includes("/quiz"));
-}, [moduleProgressData]);
-
-  if (!mod) return (
-    <div style={{ minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center", backgroundColor: "white" }}>
-    <BookLoader text="Loading module..." />
-  </div>
-  );
-
-  const totalCards = flashcards.length;
-  const totalQ = questions.length;
-  // ✅ Read directly from Convex
   const moduleProgress = moduleProgressData?.progress ?? 0;
   const quizComplete = moduleProgressData?.completed ?? false;
-  const badgeEarned = moduleProgressData?.completed ?? false;
-
-  const handleRetry = () => {
-    resetQuizProgress(moduleId);
-    setProgress((p) => ({ ...p, correctAnswers: 0, totalQuestions: 0, quizComplete: false, badgeEarned: false }));
-    window.location.href = `/modules/${moduleId}/quiz`;
-  };
+  const answeredCorrectly = moduleProgressData?.multipleChoiceCompleted ?? 0;
+  const totalQuizQuestions = moduleProgressData?.totalMultipleChoice ?? 0;
+  // `completed` only means the quiz was finished, not aced. The badge needs a
+  // clean sweep, which is also what makes "Try again" reachable.
+  const badgeEarned =
+    quizComplete && totalQuizQuestions > 0 && answeredCorrectly === totalQuizQuestions;
 
   return (
-    <div style={{ minHeight: "100vh", background: "#f3f4f6", display: "flex", justifyContent: "center", fontFamily: font }}>
-      <style>{`
-        @keyframes badgeBounce { 0%,100%{transform:translateY(0)} 50%{transform:translateY(-10px)} }
-        @keyframes badgePing   { 0%{transform:scale(1);opacity:.6} 100%{transform:scale(2);opacity:0} }
-      `}</style>
-      <Confetti active={showConfetti} />
+    <div className="min-h-screen bg-slate-50">
+      <NavMenu isMenuOpen={isMenuOpen} toggleMenu={() => setIsMenuOpen((v) => !v)} />
+      <Confetti active={justCompleted && (moduleProgressData?.completed ?? false)} />
 
-      <div style={{ width: 390, background: "#f3f4f6", minHeight: "100vh" }}>
-        <NavMenu
-          isMenuOpen={isMenuOpen}
-          toggleMenu={() => setIsMenuOpen((v) => !v)}
-          toggleDarkMode={() => {}}
-          handleLogout={() => {}}
-        />
+      {/* Hero band */}
+      <section className="bg-gradient-to-br from-green-900 via-green-800 to-green-900 text-white">
+        <div className="vw-wide py-10 lg:py-14">
+          <Link
+            href="/modules"
+            className="inline-flex items-center gap-1.5 text-green-200 hover:text-white text-sm mb-6 transition"
+          >
+            <ArrowLeft size={15} /> All modules
+          </Link>
 
-        <div style={{ padding: "20px 16px", display: "flex", flexDirection: "column", gap: 18, color: "black" }}>
+          <div className="flex flex-col lg:flex-row lg:items-end lg:justify-between gap-6">
+            <div className="max-w-3xl">
+              {mod.category && (
+                <span className="inline-block bg-white/10 backdrop-blur-sm px-3 py-1.5 rounded-full text-xs font-semibold mb-4">
+                  {mod.category}
+                </span>
+              )}
+              <h1 className="text-3xl lg:text-5xl font-bold leading-tight">{mod.title}</h1>
+              <p className="text-green-50/90 text-lg mt-4 leading-relaxed">
+                {mod.description}
+              </p>
+            </div>
 
-          {/* Back + title */}
-          <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-            <BackArrow href="/modules" />
-            <span style={{ fontSize: 15, fontWeight: 600, color: "#374151" }}>All Modules</span>
-          </div>
-
-          {/* Top card */}
-          <div style={{ background: "#fff", borderRadius: 18, boxShadow: "0 10px 30px rgba(0,0,0,.14)", padding: "24px 20px 18px", textAlign: "center" }}>
-            {mod.imageUrl
-              ? <img src={mod.imageUrl} alt={mod.title} style={{ width: 110, height: 110, objectFit: "cover", borderRadius: 12, marginBottom: 12 }} />
-              : <div style={{ width: 80, height: 80, borderRadius: "50%", background: "linear-gradient(135deg,#14532d,#22c55e)", display: "inline-flex", alignItems: "center", justifyContent: "center", marginBottom: 12 }}>
-                  <svg width="38" height="38" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="1.4">
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M12 21v-8.25M15.75 21v-8.25M8.25 21v-8.25M3 9l9-6 9 6m-1.5 12V10.332A48.36 48.36 0 0012 9.75c-2.551 0-5.056.2-7.5.582V21M3 21h18" />
-                  </svg>
-                </div>
-            }
-            <h1 style={{ margin: 0, fontSize: 20, fontWeight: 800 }}>{mod.title}</h1>
-          </div>
-
-          {/* Badge */}
-          <div style={{ display: "flex", alignItems: "center", padding: "0 4px" }}>
-            <p style={{ fontWeight: 600, margin: 0, minWidth: 56 }}>Badge:</p>
-            <div style={{ display: "flex", alignItems: "center", gap: 14, margin: "0 auto" }}>
-              <div style={{ position: "relative", width: 52, height: 52, flexShrink: 0 }}>
-                {progress.badgeEarned && (
-                  <div style={{ position: "absolute", inset: 0, borderRadius: "50%", background: "#fde68a", opacity: 0.5, animation: "badgePing 1s ease-out infinite" }} />
-                )}
-                <div style={{
-                  position: "relative", width: 52, height: 52, borderRadius: "50%",
-                  background: "#fef3c7", border: "1px solid #fde68a",
-                  display: "flex", alignItems: "center", justifyContent: "center",
-                  animation: progress.badgeEarned ? "badgeBounce 0.7s ease-in-out infinite" : "none",
-                  boxShadow: progress.badgeEarned ? "0 4px 16px rgba(245,158,11,.35)" : "none",
-                }}>
-                  <span style={{ fontSize: 22 }}>{mod.badgeIcon ?? "🏛️"}</span>
-                </div>
+            <dl className="flex gap-8 shrink-0">
+              <div>
+                <dt className="text-green-200 text-xs uppercase tracking-wide font-semibold">
+                  Flashcards
+                </dt>
+                <dd className="text-3xl font-bold mt-1">{flashcards.length}</dd>
               </div>
               <div>
-                <p style={{ margin: 0, fontWeight: 700, fontSize: 15 }}>
-                  {mod.badgeText ?? `${mod.title} Expert`}
+                <dt className="text-green-200 text-xs uppercase tracking-wide font-semibold">
+                  Questions
+                </dt>
+                <dd className="text-3xl font-bold mt-1">{questions.length}</dd>
+              </div>
+              {mod.duration && (
+                <div>
+                  <dt className="text-green-200 text-xs uppercase tracking-wide font-semibold">
+                    Minutes
+                  </dt>
+                  <dd className="text-3xl font-bold mt-1">{mod.duration}</dd>
+                </div>
+              )}
+            </dl>
+          </div>
+        </div>
+      </section>
+
+      <div className="vw-wide py-10">
+        <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,1fr)_22rem] gap-8 items-start">
+          {/* Main column */}
+          <div className="space-y-6">
+            <section className="vw-card p-6 lg:p-8">
+              <h2 className="text-xl font-bold text-slate-900 mb-5">What you will cover</h2>
+
+              <div className="grid sm:grid-cols-2 gap-4">
+                <div className="flex gap-4 rounded-xl bg-green-50 border border-green-100 p-5">
+                  <span className="shrink-0 w-11 h-11 rounded-xl bg-white flex items-center justify-center shadow-sm">
+                    <BookOpen size={20} className="text-green-700" />
+                  </span>
+                  <div>
+                    <p className="font-bold text-slate-900">
+                      {flashcards.length} flashcard{flashcards.length !== 1 ? "s" : ""}
+                    </p>
+                    <p className="text-sm text-slate-600 mt-1 leading-relaxed">
+                      Short prompts you reveal at your own pace.
+                    </p>
+                  </div>
+                </div>
+
+                <div className="flex gap-4 rounded-xl bg-orange-50 border border-orange-100 p-5">
+                  <span className="shrink-0 w-11 h-11 rounded-xl bg-white flex items-center justify-center shadow-sm">
+                    <ClipboardList size={20} className="text-orange-600" />
+                  </span>
+                  <div>
+                    <p className="font-bold text-slate-900">
+                      {questions.length} quiz question{questions.length !== 1 ? "s" : ""}
+                    </p>
+                    <p className="text-sm text-slate-600 mt-1 leading-relaxed">
+                      Answer them all correctly to earn the badge.
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              {mod.content && (
+                <div className="vw-prose mt-6 pt-6 border-t border-slate-100">
+                  <p>{mod.content}</p>
+                </div>
+              )}
+            </section>
+
+            {/* Flashcard preview — gives the desktop page something to show */}
+            {flashcards.length > 0 && (
+              <section className="vw-card p-6 lg:p-8">
+                <div className="flex items-center justify-between gap-4 mb-5">
+                  <h2 className="text-xl font-bold text-slate-900">In this module</h2>
+                  <Link
+                    href={`/modules/${moduleId}/flashcards`}
+                    className="text-sm font-semibold text-green-700 hover:text-green-900 transition"
+                  >
+                    Open all {flashcards.length} →
+                  </Link>
+                </div>
+
+                <ul className="grid sm:grid-cols-2 gap-3">
+                  {flashcards.slice(0, 6).map((card, i) => (
+                    <li
+                      key={card._id}
+                      className="flex gap-3 rounded-xl border border-slate-200 bg-slate-50/60 p-4"
+                    >
+                      <span className="shrink-0 w-6 h-6 rounded-full bg-white border border-slate-200 text-xs font-bold text-slate-500 flex items-center justify-center">
+                        {i + 1}
+                      </span>
+                      <p className="text-sm text-slate-700 leading-relaxed">
+                        {card.question}
+                      </p>
+                    </li>
+                  ))}
+                </ul>
+              </section>
+            )}
+          </div>
+
+          {/* Sticky action rail */}
+          <aside className="lg:sticky lg:top-24 space-y-4">
+            <div className="vw-card p-6">
+              <div className="flex items-baseline justify-between mb-2">
+                <h2 className="font-bold text-slate-900">Your progress</h2>
+                <span className="text-2xl font-extrabold text-green-700">
+                  {moduleProgress}%
+                </span>
+              </div>
+              <div
+                className="h-2.5 rounded-full bg-slate-200 overflow-hidden"
+                role="progressbar"
+                aria-valuenow={moduleProgress}
+                aria-valuemin={0}
+                aria-valuemax={100}
+                aria-label="Module progress"
+              >
+                <div
+                  className="h-full bg-green-600 rounded-full transition-all duration-700"
+                  style={{ width: `${moduleProgress}%` }}
+                />
+              </div>
+
+              <Link
+                href={`/modules/${moduleId}/flashcards`}
+                className="mt-6 flex items-center justify-center gap-2 w-full py-3.5 rounded-xl bg-green-800 text-white font-semibold hover:bg-green-900 transition shadow-md"
+              >
+                <Play size={17} />
+                {quizComplete ? "Review the module" : moduleProgress > 0 ? "Continue" : "Start learning"}
+              </Link>
+
+              {quizComplete && !badgeEarned && (
+                <Link
+                  href={`/modules/${moduleId}/quiz`}
+                  className="mt-3 flex items-center justify-center gap-2 w-full py-3 rounded-xl border-2 border-green-800 text-green-900 font-semibold hover:bg-green-50 transition"
+                >
+                  <RotateCcw size={16} />
+                  Retake the quiz for the badge
+                </Link>
+              )}
+            </div>
+
+            {/* Badge */}
+            <div
+              className={`vw-card p-6 ${badgeEarned ? "border-amber-300 bg-amber-50/50" : ""}`}
+            >
+              <h2 className="font-bold text-slate-900 mb-4">Badge</h2>
+              <div className="flex items-center gap-4">
+                <span
+                  className={`shrink-0 w-14 h-14 rounded-full border flex items-center justify-center text-2xl ${
+                    badgeEarned
+                      ? "bg-amber-100 border-amber-300 shadow-[0_4px_16px_rgba(245,158,11,0.35)]"
+                      : "bg-slate-100 border-slate-200 grayscale opacity-60"
+                  }`}
+                >
+                  {isEmojiGlyph(mod.badgeIcon) ? (
+                    mod.badgeIcon
+                  ) : (
+                    <Award size={24} className={badgeEarned ? "text-amber-600" : "text-slate-400"} />
+                  )}
+                </span>
+                <div className="min-w-0">
+                  <p className="font-bold text-slate-900 leading-snug">
+                    {mod.badgeText ?? `${mod.title} Expert`}
+                  </p>
+                  <p
+                    className={`text-sm mt-0.5 font-medium ${
+                      badgeEarned ? "text-green-700" : "text-slate-400"
+                    }`}
+                  >
+                    {badgeEarned ? (
+                      <span className="inline-flex items-center gap-1">
+                        <CheckCircle2 size={14} /> Earned
+                      </span>
+                    ) : (
+                      "Not earned yet"
+                    )}
+                  </p>
+                </div>
+              </div>
+
+              {!badgeEarned && totalQuizQuestions > 0 && (
+                <p className="text-xs text-slate-500 mt-4 leading-relaxed">
+                  Answer all {totalQuizQuestions} quiz questions correctly to earn this badge.
                 </p>
-                <p style={{ margin: 0, fontSize: 13, color: progress.badgeEarned ? "#16a34a" : "#9ca3af", fontWeight: progress.badgeEarned ? 600 : 400 }}>
-                  {progress.badgeEarned ? "Earned ✓" : "Not earned yet"}
+              )}
+            </div>
+
+            <div className="vw-card p-6">
+              <h2 className="font-bold text-slate-900 mb-3 flex items-center gap-2">
+                <Trophy size={17} className="text-amber-500" /> Points
+              </h2>
+              <p className="text-sm text-slate-600 leading-relaxed">
+                Completing this module awards up to <strong>30 points</strong>, scaled by how
+                many questions you get right. Points are awarded once per module.
+              </p>
+              {mod.duration && (
+                <p className="flex items-center gap-1.5 text-xs text-slate-400 mt-4 pt-4 border-t border-slate-100">
+                  <Clock size={13} /> About {mod.duration} minutes
                 </p>
-              </div>
+              )}
             </div>
-          </div>
-
-          {/* Progress bar */}
-          <div style={{ padding: "0 4px" }}>
-            <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12, color: "#374151", marginBottom: 5 }}>
-              <span>Your Progress:</span><span>{moduleProgress}%</span>
-            </div>
-            <div style={{ height: 10, background: "#e5e7eb", borderRadius: 99, overflow: "hidden" }}>
-              <div style={{ height: "100%", width: `${moduleProgress}%`, background: "#16a34a", borderRadius: 99, transition: "width 0.8s ease" }} />
-            </div>
-          </div>
-
-          {/* Content summary */}
-          <div style={{ background: "#fff", borderRadius: 18, boxShadow: "0 10px 30px rgba(0,0,0,.14)", padding: "18px 20px" }}>
-            <h2 style={{ margin: "0 0 16px", fontWeight: 700, fontSize: 16 }}>Module Content</h2>
-            <div style={{ display: "flex", alignItems: "center", gap: 14, marginBottom: 14 }}>
-              <div style={{ width: 38, height: 38, borderRadius: 10, background: "#dcfce7", display: "flex", alignItems: "center", justifyContent: "center" }}>
-                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#16a34a" strokeWidth="1.5">
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M12 6.042A8.967 8.967 0 006 3.75c-1.052 0-2.062.18-3 .512v14.25A8.987 8.987 0 016 18c2.305 0 4.408.867 6 2.292m0-14.25a8.966 8.966 0 016-2.292c1.052 0 2.062.18 3 .512v14.25A8.987 8.987 0 0018 18a8.967 8.967 0 00-6 2.292m0-14.25v14.25" />
-                </svg>
-              </div>
-              <span style={{ fontSize: 15 }}>{flashcards.length} learning flashcard{flashcards.length !== 1 ? "s" : ""}</span>
-            </div>
-            <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
-              <div style={{ width: 38, height: 38, borderRadius: 10, background: "#ffedd5", display: "flex", alignItems: "center", justifyContent: "center" }}>
-                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#ea580c" strokeWidth="1.5">
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M9 12h3.75M9 15h3.75M9 18h3.75m3 .75H18a2.25 2.25 0 002.25-2.25V6.108c0-1.135-.845-2.098-1.976-2.192a48.424 48.424 0 00-1.123-.08m-5.801 0c-.065.21-.1.433-.1.664 0 .414.336.75.75.75h4.5a.75.75 0 00.75-.75 2.25 2.25 0 00-.1-.664m-5.8 0A2.251 2.251 0 0113.5 2.25H15c1.012 0 1.867.668 2.15 1.586m-5.8 0c-.376.023-.75.05-1.124.08C9.095 4.01 8.25 4.973 8.25 6.108V8.25m0 0H4.875c-.621 0-1.125.504-1.125 1.125v11.25c0 .621.504 1.125 1.125 1.125h9.75c.621 0 1.125-.504 1.125-1.125V9.375c0-.621-.504-1.125-1.125-1.125H8.25zM6.75 12h.008v.008H6.75V12zm0 3h.008v.008H6.75V15zm0 3h.008v.008H6.75V18z" />
-                </svg>
-              </div>
-              <span style={{ fontSize: 15 }}>{questions.length} quiz question{questions.length !== 1 ? "s" : ""}</span>
-            </div>
-          </div>
-
-          <p style={{ textAlign: "center", fontSize: 13, color: "#6b7280", margin: "0 8px", lineHeight: 1.6 }}>
-            {mod.description}
-          </p>
-
-          {/* CTA buttons */}
-          <a href={`/modules/${moduleId}/flashcards`} style={{
-            display: "block", width: "100%", padding: "15px",
-            background: "#14532d", color: "#fff", textDecoration: "none",
-            border: "none", borderRadius: 14, fontSize: 16, fontWeight: 600,
-            cursor: "pointer", boxShadow: "0 6px 16px rgba(0,0,0,.2)",
-            textAlign: "center", boxSizing: "border-box",
-          }}>
-            {quizComplete ? "Review Learning" : "Start Learning"}
-          </a>
-
-          {quizComplete && !badgeEarned && (
-            <button onClick={handleRetry} style={{
-              width: "100%", padding: "14px", background: "#fff", color: "#14532d",
-              border: "2px solid #14532d", borderRadius: 14, fontSize: 15, fontWeight: 600,
-              cursor: "pointer", marginTop: -8, fontFamily: "inherit",
-            }}>
-              🔄 Try Again
-            </button>
-          )}
+          </aside>
         </div>
       </div>
     </div>

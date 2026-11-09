@@ -1,10 +1,20 @@
 import { v } from "convex/values";
-import { mutation, query } from "./_generated/server";
+import { mutation, query, type MutationCtx, type QueryCtx } from "./_generated/server";
+import { getUserId, requireUserId } from "./authHelpers";
+
+/**
+ * Learner progress, points and leaderboard.
+ *
+ * SECURITY NOTE: every function here used to accept `userId` (and `name` /
+ * `email`) as arguments. Convex functions are public endpoints, so that allowed
+ * anyone to read another learner's dashboard or write points into their profile
+ * by guessing an id. Identity is now taken from the auth token via
+ * `getUserId` / `requireUserId` and never from the caller.
+ */
 
 const POINTS_PER_MODULE = 30;
 
-// ── Position-based rank with ties ─────────────────────────────────────────────
-// If positions 1,2,3 all have 90pts → all rank 1, next person is rank 4
+/** Ties share a rank: 90, 90, 90, 50 → 1, 1, 1, 4. */
 function assignRanks(profiles: { points: number }[]): number[] {
   const ranks: number[] = [];
   let currentRank = 1;
@@ -17,56 +27,65 @@ function assignRanks(profiles: { points: number }[]): number[] {
   return ranks;
 }
 
-// ── Get or create a user profile ──────────────────────────────────────────────
-async function getOrCreateProfile(ctx: any, userId: string, name: string, email: string) {
+async function publishedModuleCount(ctx: QueryCtx | MutationCtx): Promise<number> {
+  const modules = await ctx.db
+    .query("modules")
+    .withIndex("by_published", (q) => q.eq("isPublished", true))
+    .collect();
+  return modules.length;
+}
+
+/**
+ * The auth trigger in auth.ts creates a profile on sign-up, so this is only a
+ * safety net for accounts made before that trigger existed.
+ */
+async function getOrCreateProfile(ctx: MutationCtx, userId: string) {
   const existing = await ctx.db
     .query("profile")
-    .withIndex("by_userId", (q: any) => q.eq("userId", userId))
+    .withIndex("by_userId", (q) => q.eq("userId", userId))
     .first();
 
   if (existing) return existing;
 
-  const totalModules = await ctx.db
-    .query("modules")
-    .filter((q: any) => q.eq(q.field("isPublished"), true))
-    .collect()
-    .then((m: any[]) => m.length);
+  const user = await ctx.db
+    .query("profile")
+    .withIndex("by_userId", (q) => q.eq("userId", userId))
+    .first();
 
   const id = await ctx.db.insert("profile", {
     userId,
-    name,
-    email,
+    name: user?.name ?? "Learner",
+    email: user?.email ?? "",
     points: 0,
     rank: "Unranked",
     modulesCompleted: 0,
-    totalModules,
+    totalModules: await publishedModuleCount(ctx),
     badgesEarned: 0,
     progressPercentage: 0,
     lastActive: Date.now(),
     createdAt: Date.now(),
   });
 
-  return await ctx.db.get(id);
+  const created = await ctx.db.get(id);
+  if (!created) throw new Error("Failed to create profile.");
+  return created;
 }
 
-// ── Complete a module: award points, update progress ─────────────────────────
 export const completeModule = mutation({
   args: {
-    userId: v.string(),
     moduleId: v.id("modules"),
-    name: v.string(),
-    email: v.string(),
     correctAnswers: v.number(),
     totalQuestions: v.number(),
     totalFlashcards: v.number(),
   },
   handler: async (ctx, args) => {
-    const { userId, moduleId, name, email, correctAnswers, totalQuestions, totalFlashcards } = args;
+    const userId = await requireUserId(ctx);
+    const { moduleId, correctAnswers, totalQuestions, totalFlashcards } = args;
 
     const existingProgress = await ctx.db
       .query("userModuleProgress")
       .withIndex("by_userId_and_moduleId", (q) =>
-        q.eq("userId", userId).eq("moduleId", moduleId)
+        q.eq("userId", userId).eq("moduleId", moduleId),
       )
       .first();
 
@@ -99,132 +118,122 @@ export const completeModule = mutation({
       });
     }
 
-    if (!alreadyCompleted) {
-      const profile = await getOrCreateProfile(ctx, userId, name, email);
-      const earnedPoints = Math.round((correctAnswers / Math.max(1, totalQuestions)) * POINTS_PER_MODULE);
-      const newPoints = profile.points + earnedPoints;
-
-      const allCompleted = await ctx.db
-        .query("userModuleProgress")
-        .withIndex("by_userId", (q) => q.eq("userId", userId))
-        .filter((q) => q.eq(q.field("completed"), true))
-        .collect();
-
-      const modulesCompleted = allCompleted.length;
-
-      const allModules = await ctx.db
-        .query("modules")
-        .filter((q) => q.eq(q.field("isPublished"), true))
-        .collect();
-
-      const totalModules = allModules.length;
-      const progressPercentage = Math.round((modulesCompleted / Math.max(1, totalModules)) * 100);
-
-      // Calculate live rank
-      const allProfiles = await ctx.db
-        .query("profile")
-        .withIndex("by_points")
-        .order("desc")
-        .collect();
-
-      const updatedProfiles = allProfiles
-        .map((p) => ({ ...p, points: p.userId === userId ? newPoints : p.points }))
-        .sort((a, b) => b.points - a.points);
-
-      const ranks = assignRanks(updatedProfiles);
-      const myIndex = updatedProfiles.findIndex((p) => p.userId === userId);
-      const myRank = myIndex >= 0 ? ranks[myIndex] : allProfiles.length + 1;
-
-      await ctx.db.patch(profile._id, {
-        points: newPoints,
-        rank: String(myRank),
-        modulesCompleted,
-        totalModules,
-        progressPercentage,
-        lastActive: Date.now(),
-      });
-
-      await ctx.db.insert("recentActivity", {
-        userId,
-        activityType: "module_completed",
-        moduleId,
-        description: `Completed a module and earned ${earnedPoints} points!`,
-        timestamp: Date.now(),
-      });
+    // Points are only ever awarded once per module, so replaying a quiz cannot
+    // farm the leaderboard.
+    if (alreadyCompleted) {
+      return { alreadyCompleted: true, pointsAwarded: 0 };
     }
 
-    return { alreadyCompleted, pointsAwarded: alreadyCompleted ? 0 : POINTS_PER_MODULE };
+    const profile = await getOrCreateProfile(ctx, userId);
+    const earnedPoints = Math.round(
+      (correctAnswers / Math.max(1, totalQuestions)) * POINTS_PER_MODULE,
+    );
+    const newPoints = profile.points + earnedPoints;
+
+    const allCompleted = await ctx.db
+      .query("userModuleProgress")
+      .withIndex("by_userId", (q) => q.eq("userId", userId))
+      .filter((q) => q.eq(q.field("completed"), true))
+      .collect();
+
+    const totalModules = await publishedModuleCount(ctx);
+    const modulesCompleted = allCompleted.length;
+    const progressPercentage = Math.round(
+      (modulesCompleted / Math.max(1, totalModules)) * 100,
+    );
+
+    await ctx.db.patch(profile._id, {
+      points: newPoints,
+      modulesCompleted,
+      totalModules,
+      progressPercentage,
+      lastActive: Date.now(),
+    });
+
+    await ctx.db.insert("recentActivity", {
+      userId,
+      activityType: "module_completed",
+      moduleId,
+      description:
+        earnedPoints > 0
+          ? `Completed a module and earned ${earnedPoints} points!`
+          : "Completed a module.",
+      timestamp: Date.now(),
+    });
+
+    return { alreadyCompleted: false, pointsAwarded: earnedPoints };
   },
 });
 
-// ── Get user dashboard data ───────────────────────────────────────────────────
 export const getDashboardData = query({
-  args: { userId: v.string() },
-  handler: async (ctx, args) => {
+  args: {},
+  handler: async (ctx) => {
+    const userId = await getUserId(ctx);
+    if (!userId) return null;
+
     const profile = await ctx.db
       .query("profile")
-      .withIndex("by_userId", (q) => q.eq("userId", args.userId))
+      .withIndex("by_userId", (q) => q.eq("userId", userId))
       .first();
 
     if (!profile) return null;
 
-    // Recalculate rank live every time
+    // Rank is recomputed on read so it is never stale.
     const allProfiles = await ctx.db
       .query("profile")
       .withIndex("by_points")
       .order("desc")
-      .collect();
+      .take(500);
 
     const ranks = assignRanks(allProfiles);
-    const myIndex = allProfiles.findIndex((p) => p.userId === args.userId);
+    const myIndex = allProfiles.findIndex((p) => p.userId === userId);
     const myRank = myIndex >= 0 ? ranks[myIndex] : null;
 
-    const allModules = await ctx.db
-      .query("modules")
-      .filter((q) => q.eq(q.field("isPublished"), true))
-      .collect();
-
-    const totalModules = allModules.length;
-    const progressPercentage = Math.round(
-      (profile.modulesCompleted / Math.max(1, totalModules)) * 100
-    );
+    const totalModules = await publishedModuleCount(ctx);
 
     return {
       points: profile.points,
-      rank: myRank !== null ? myRank : null,   // number e.g. 1, 2, 3
+      rank: myRank,
       modulesCompleted: profile.modulesCompleted,
       totalModules,
-      progressPercentage,
+      progressPercentage: Math.round(
+        (profile.modulesCompleted / Math.max(1, totalModules)) * 100,
+      ),
       badgesEarned: profile.badgesEarned,
+      name: profile.name,
     };
   },
 });
 
-// ── Get recent activity for a user ───────────────────────────────────────────
 export const getRecentActivity = query({
-  args: { userId: v.string() },
-  handler: async (ctx, args) => {
+  args: {},
+  handler: async (ctx) => {
+    const userId = await getUserId(ctx);
+    if (!userId) return [];
+
     const activities = await ctx.db
       .query("recentActivity")
-      .withIndex("by_userId_and_timestamp", (q) => q.eq("userId", args.userId))
+      .withIndex("by_userId_and_timestamp", (q) => q.eq("userId", userId))
       .order("desc")
       .take(10);
 
     return await Promise.all(
-      activities.map(async (a) => {
-        const moduleTitle = a.moduleId
-          ? (await ctx.db.get(a.moduleId))?.title ?? null
-          : null;
-        return { ...a, moduleTitle };
-      })
+      activities.map(async (a) => ({
+        ...a,
+        moduleTitle: a.moduleId ? ((await ctx.db.get(a.moduleId))?.title ?? null) : null,
+      })),
     );
   },
 });
 
-// ── Leaderboard ───────────────────────────────────────────────────────────────
 export const getLeaderboard = query({
   args: {},
   handler: async (ctx) => {
+    // The board itself is public — it is the same information every learner
+    // already sees — but we tag the caller's own row so the client does not
+    // need to know anyone else's id to highlight it.
+    const userId = await getUserId(ctx);
+
     const profiles = await ctx.db
       .query("profile")
       .withIndex("by_points")
@@ -234,22 +243,24 @@ export const getLeaderboard = query({
     const ranks = assignRanks(profiles);
 
     return profiles.map((p, i) => ({
-      rank: ranks[i],       // e.g. 1,1,1,4 if three people tied at top
+      rank: ranks[i],
       name: p.name,
       points: p.points,
       modulesCompleted: p.modulesCompleted,
-      userId: p.userId,
+      isMe: userId !== null && p.userId === userId,
     }));
   },
 });
 
-// ── Get user's completed module IDs ──────────────────────────────────────────
 export const getCompletedModules = query({
-  args: { userId: v.string() },
-  handler: async (ctx, args) => {
+  args: {},
+  handler: async (ctx) => {
+    const userId = await getUserId(ctx);
+    if (!userId) return [];
+
     const completed = await ctx.db
       .query("userModuleProgress")
-      .withIndex("by_userId", (q) => q.eq("userId", args.userId))
+      .withIndex("by_userId", (q) => q.eq("userId", userId))
       .filter((q) => q.eq(q.field("completed"), true))
       .collect();
 
@@ -258,32 +269,36 @@ export const getCompletedModules = query({
 });
 
 export const getModuleProgress = query({
-  args: { userId: v.string(), moduleId: v.id("modules") },
+  args: { moduleId: v.id("modules") },
   handler: async (ctx, args) => {
-    const progress = await ctx.db
-      .query("userModuleProgress")
-      .withIndex("by_userId_and_moduleId", (q) =>
-        q.eq("userId", args.userId).eq("moduleId", args.moduleId)
-      )
-      .first();
-    return progress ?? null;
+    const userId = await getUserId(ctx);
+    if (!userId) return null;
+
+    return (
+      (await ctx.db
+        .query("userModuleProgress")
+        .withIndex("by_userId_and_moduleId", (q) =>
+          q.eq("userId", userId).eq("moduleId", args.moduleId),
+        )
+        .first()) ?? null
+    );
   },
 });
 
 export const markFlashcardSeen = mutation({
   args: {
-    userId: v.string(),
     moduleId: v.id("modules"),
     flashcardsSeen: v.number(),
     totalFlashcards: v.number(),
   },
   handler: async (ctx, args) => {
-    const { userId, moduleId, flashcardsSeen, totalFlashcards } = args;
+    const userId = await requireUserId(ctx);
+    const { moduleId, flashcardsSeen, totalFlashcards } = args;
 
     const existing = await ctx.db
       .query("userModuleProgress")
       .withIndex("by_userId_and_moduleId", (q) =>
-        q.eq("userId", userId).eq("moduleId", moduleId)
+        q.eq("userId", userId).eq("moduleId", moduleId),
       )
       .first();
 
@@ -292,19 +307,20 @@ export const markFlashcardSeen = mutation({
         flashcardsCompleted: flashcardsSeen,
         totalFlashcards,
       });
-    } else {
-      await ctx.db.insert("userModuleProgress", {
-        userId,
-        moduleId,
-        completed: false,
-        startedAt: Date.now(),
-        progress: 0,
-        currentQuestionIndex: 0,
-        flashcardsCompleted: flashcardsSeen,
-        multipleChoiceCompleted: 0,
-        totalFlashcards,
-        totalMultipleChoice: 0,
-      });
+      return;
     }
+
+    await ctx.db.insert("userModuleProgress", {
+      userId,
+      moduleId,
+      completed: false,
+      startedAt: Date.now(),
+      progress: 0,
+      currentQuestionIndex: 0,
+      flashcardsCompleted: flashcardsSeen,
+      multipleChoiceCompleted: 0,
+      totalFlashcards,
+      totalMultipleChoice: 0,
+    });
   },
 });

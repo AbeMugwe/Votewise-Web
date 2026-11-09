@@ -1,111 +1,176 @@
 "use client";
+import { useEffect } from "react";
+import { usePathname } from "next/navigation";
+import Link from "next/link";
 import {
-  Menu, X, Home, BookOpen, BarChart3, User, Settings,
-  Moon, HelpCircle, Users, LogOut
+  Menu, X, Home, BookOpen, BarChart3, Users, ScrollText,
+  IdCard, Scale, LogOut, ExternalLink, UserSearch, Landmark, ListChecks, MapPin,
 } from "lucide-react";
 
-type SidebarMenuProps = {
+type NavMenuProps = {
   isMenuOpen: boolean;
   toggleMenu: () => void;
-  toggleDarkMode: () => void;
-  handleLogout: () => void;
-  title?: string; // optional: "VoteWise Kenya"
+  handleLogout?: () => void;
+  /** Hide the log-out control on public pages where there is no session. */
+  showLogout?: boolean;
+  title?: string;
 };
+
+const PRIMARY_LINKS = [
+  { href: "/landing", label: "Dashboard", icon: Home },
+  { href: "/modules", label: "Learning", icon: BookOpen },
+  { href: "/leaderboard", label: "Leaderboard", icon: BarChart3 },
+];
+
+const CIVIC_LINKS = [
+  { href: "/politicians", label: "Who represents you", icon: Users },
+  { href: "/candidates", label: "Candidate profiles", icon: UserSearch },
+  { href: "/leaders", label: "Who is in office", icon: Landmark },
+  { href: "/record", label: "Promises and delivery", icon: ListChecks },
+  { href: "/where-to-vote", label: "Where to vote", icon: MapPin },
+  { href: "/voter-card", label: "Get registered to vote", icon: IdCard },
+  { href: "/rights", label: "Know your rights", icon: Scale },
+];
 
 export default function NavMenu({
   isMenuOpen,
   toggleMenu,
-  toggleDarkMode,
   handleLogout,
+  showLogout = true,
   title = "VoteWise Kenya",
-}: SidebarMenuProps) {
+}: NavMenuProps) {
+  const pathname = usePathname();
+
+  // Close the drawer on Escape, and stop the page scrolling behind it.
+  useEffect(() => {
+    if (!isMenuOpen) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") toggleMenu();
+    };
+    window.addEventListener("keydown", onKey);
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => {
+      window.removeEventListener("keydown", onKey);
+      document.body.style.overflow = previousOverflow;
+    };
+  }, [isMenuOpen, toggleMenu]);
+
+  const isActive = (href: string) =>
+    pathname === href || pathname.startsWith(href + "/");
+
+  const linkClass = (href: string) =>
+    `flex items-center gap-3 px-4 py-3 rounded-lg transition font-medium ${
+      isActive(href)
+        ? "bg-green-50 text-green-800"
+        : "text-gray-700 hover:bg-gray-100"
+    }`;
+
   return (
     <>
-      {/* Header */}
-      <header className="bg-green-800 text-white px-6 py-4 flex items-center justify-between sticky top-0 z-40">
-        <h1 className="text-xl font-bold"><a href="/landing">{title}</a></h1>
+      <header className="bg-green-800 text-white px-4 sm:px-6 py-4 flex items-center justify-between sticky top-0 z-40">
+        <Link href="/landing" className="text-lg sm:text-xl font-bold hover:opacity-90 transition">
+          {title}
+        </Link>
+
+        {/* Inline links on desktop so the primary sections are one click away. */}
+        <nav className="hidden md:flex items-center gap-1">
+          {[...PRIMARY_LINKS, ...CIVIC_LINKS].map(({ href, label }) => (
+            <Link
+              key={href}
+              href={href}
+              className={`px-3 py-2 rounded-lg text-sm transition ${
+                isActive(href)
+                  ? "bg-green-900 text-white font-semibold"
+                  : "text-green-50 hover:bg-green-700"
+              }`}
+            >
+              {label}
+            </Link>
+          ))}
+        </nav>
+
         <button
           onClick={toggleMenu}
-          className="p-2 hover:bg-green-700 rounded-lg transition"
+          aria-label={isMenuOpen ? "Close menu" : "Open menu"}
+          aria-expanded={isMenuOpen}
+          className="p-2 hover:bg-green-700 rounded-lg transition md:hidden"
         >
           {isMenuOpen ? <X size={24} /> : <Menu size={24} />}
         </button>
       </header>
 
-      {/* Sidebar */}
       <div
-        className={`fixed top-0 right-0 h-full w-64 bg-white shadow-2xl transform transition-transform duration-300 ease-in-out z-50 ${
+        role="dialog"
+        aria-modal="true"
+        aria-hidden={!isMenuOpen}
+        className={`md:hidden fixed top-0 right-0 h-full w-72 max-w-[85vw] bg-white shadow-2xl transform transition-transform duration-300 ease-in-out z-50 overflow-y-auto ${
           isMenuOpen ? "translate-x-0" : "translate-x-full"
         }`}
       >
-        <div className="p-6">
+        <div className="p-5">
           <button
             onClick={toggleMenu}
-            className="absolute text-black top-4 right-4 p-2 hover:bg-gray-100 rounded-lg"
+            aria-label="Close menu"
+            className="absolute text-gray-600 top-4 right-4 p-2 hover:bg-gray-100 rounded-lg"
           >
-            <X size={24} />
+            <X size={22} />
           </button>
 
-          <nav className="mt-12 space-y-2">
-            <a href="/landing" className="flex text-black items-center gap-3 px-4 py-3 rounded-lg hover:bg-gray-100 transition">
-              <Home size={20} />
-              <span className="font-medium">Dashboard</span>
-            </a>
+          <nav className="mt-12 space-y-1">
+            {PRIMARY_LINKS.map(({ href, label, icon: Icon }) => (
+              <Link key={href} href={href} onClick={toggleMenu} className={linkClass(href)}>
+                <Icon size={20} />
+                <span>{label}</span>
+              </Link>
+            ))}
 
-            <a href="/modules" className="flex text-black items-center gap-3 px-4 py-3 rounded-lg hover:bg-gray-100 transition">
-              <BookOpen size={20} />
-              <span className="font-medium">Learning</span>
-            </a>
+            <p className="px-4 pt-5 pb-1 text-xs font-semibold uppercase tracking-wide text-gray-400">
+              Civic guide
+            </p>
+            {CIVIC_LINKS.map(({ href, label, icon: Icon }) => (
+              <Link key={href} href={href} onClick={toggleMenu} className={linkClass(href)}>
+                <Icon size={20} />
+                <span>{label}</span>
+              </Link>
+            ))}
 
-            <a href="/leaderboard" className="flex text-black items-center gap-3 px-4 py-3 rounded-lg hover:bg-gray-100 transition">
-              <BarChart3 size={20} />
-              <span className="font-medium">Leaderboard</span>
-            </a>
-
-            <a href="#" className="flex text-black items-center gap-3 px-4 py-3 rounded-lg hover:bg-gray-100 transition">
-              <User size={20} />
-              <span className="font-medium">Your Profile</span>
-            </a>
-
-            <a href="#" className="flex text-black items-center gap-3 px-4 py-3 rounded-lg hover:bg-gray-100 transition">
-              <Settings size={20} />
-              <span className="font-medium">Settings</span>
-            </a>
-
-            <button
-              onClick={toggleDarkMode}
-              className="flex items-center gap-3 px-4 py-3 rounded-lg hover:bg-gray-100 transition w-full text-left text-black"
+            <p className="px-4 pt-5 pb-1 text-xs font-semibold uppercase tracking-wide text-gray-400">
+              Official sources
+            </p>
+            <a
+              href="https://www.iebc.or.ke/"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="flex items-center gap-3 px-4 py-3 rounded-lg text-gray-700 hover:bg-gray-100 transition font-medium"
             >
-              <Moon size={20} />
-              <span className="font-medium">Dark Mode</span>
-            </button>
-
-            <a href="#" className="flex text-black items-center gap-3 px-4 py-3 rounded-lg hover:bg-gray-100 transition">
-              <HelpCircle size={20} />
-              <span className="font-medium">Help</span>
+              <ScrollText size={20} />
+              <span className="flex-1">IEBC</span>
+              <ExternalLink size={14} className="text-gray-400" />
             </a>
 
-            <a href="#" className="flex text-black items-center gap-3 px-4 py-3 rounded-lg hover:bg-gray-100 transition">
-              <Users size={20} />
-              <span className="font-medium">About Us</span>
+            <a href="/lite" className="flex items-center gap-3 px-4 py-3 rounded-lg text-gray-700 hover:bg-gray-100 transition font-medium">
+              Low-data version (2G)
             </a>
 
-            <button
-              onClick={handleLogout}
-              className="flex items-center gap-3 px-4 py-3 rounded-lg bg-red-500 text-white hover:bg-red-600 transition w-full mt-4"
-            >
-              <LogOut size={20} />
-              <span className="font-medium">Log out</span>
-            </button>
+            {showLogout && handleLogout && (
+              <button
+                onClick={handleLogout}
+                className="flex items-center gap-3 px-4 py-3 rounded-lg bg-red-500 text-white hover:bg-red-600 transition w-full mt-6 font-medium"
+              >
+                <LogOut size={20} />
+                <span>Log out</span>
+              </button>
+            )}
           </nav>
         </div>
       </div>
 
-      {/* Overlay */}
       {isMenuOpen && (
         <div
-          className="fixed inset-0 bg-black/40 z-40"
+          className="md:hidden fixed inset-0 bg-black/40 z-40"
           onClick={toggleMenu}
+          aria-hidden="true"
         />
       )}
     </>

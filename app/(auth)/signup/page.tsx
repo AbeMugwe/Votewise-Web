@@ -56,7 +56,7 @@ export default function VoteWiseCreateAccount() {
   }
 
 
-  // ✅ At this point, the user has been created (stored in Convex by Better Auth)
+  // At this point, the user has been created in Convex by Better Auth.
   router.push("/landing");
   console.log("Signed up:", data);
 };

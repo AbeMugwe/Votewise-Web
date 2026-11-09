@@ -3,7 +3,6 @@ import React, { useState } from 'react';
 import { Eye, EyeOff } from 'lucide-react';
 import { authClient } from "@/lib/auth-client";
 import { useRouter } from 'next/navigation';
-import { useAuthActions } from '@convex-dev/auth/react';
 
 export default function VoteWiseCreateAccount() {
   const [showPassword, setShowPassword] = useState(false);
@@ -36,7 +35,7 @@ export default function VoteWiseCreateAccount() {
     return;
   }
 
-  // ✅ At this point, the user has been created (stored in Convex by Better Auth)
+  // At this point, the session has been created in Convex by Better Auth.
   router.push("/landing");
   console.log("Signed in:", data);
 };
@@ -63,7 +62,7 @@ export default function VoteWiseCreateAccount() {
           <div className="text-center mb-6">
             <h2 className="text-2xl text-black font-bold mb-2">Sign in to your account</h2>
             <p className="text-gray-600">
-              Don't  have an account?{' '}
+              Don&apos;t have an account?{' '}
               <a href="./signup" className="text-green-700 hover:underline font-semibold">
                 Sign Up
               </a>
